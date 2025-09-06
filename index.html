@@ -4,10 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>오늘 그릴 그림은? | 조약돌 마을</title>
-  <!-- Tailwind (CDN, 무빌드) -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* 3D 카드 + 사파리 대응 */
     .scene { perspective: 1200px; -webkit-perspective: 1200px; }
     .card { transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
             transition: transform .8s cubic-bezier(.2,.8,.2,1); will-change: transform; }
@@ -164,7 +162,7 @@
       {id:232,title:"무쌍꺼풀",examples:["매끈 윗선","심플 동공","아이라인 얇게","담백 눈매","시크"]},
       {id:233,title:"눈 밑 다크서클",examples:["아래 반원 음영","세로 주름","피곤 말풍선","하품","커피"]},
       {id:234,title:"주근깨가 있는",examples:["코·볼 점점점","오렌지 톤","햇살","웃을 때 강조","장난스러움"]},
-      {id:235,title:"점(뷰티마크)이 있는",examples:["입가 점","눈밑 점","코옆 점","강조 동그라미","포인트]"]},
+      {id:235,title:"점(뷰티마크)이 있는",examples:["입가 점","눈밑 점","코옆 점","강조 동그라미","포인트"]},
       {id:236,title:"치아가 고른",examples:["밝은 이빨","스마일 라인","화이트닝","😁 이모지","광택"]},
       {id:237,title:"앞니가 토끼 같은",examples:["두 앞니 강조","아래 작은 이","귀여운 미소","치아 하이라이트","토끼"]},
       {id:238,title:"입꼬리가 올라간",examples:["윙 스마일","광대 하이라이트","웃는 눈","볼 주름","기분 좋음"]},
@@ -194,7 +192,12 @@
       set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
     };
 
+    const PREMIUM_PASS = "Whdirehfakdmf";
+    let premiumUnlocked = storage.get("emojiIdea.premiumUnlocked", false);
+
     let mode = storage.get("emojiIdea.mode","situation"); // 'situation' | 'personality' | 'appearance'
+    if (!premiumUnlocked && (mode==='personality' || mode==='appearance')) mode = 'situation';
+
     let flipped=false, current=null;
     let history = storage.get("emojiIdea.historyV2", []); // {type,id,t}[]
     const $ = s => document.querySelector(s);
@@ -223,9 +226,9 @@
             </div>
             <div class="flex items-center gap-2">
               <div class="grid grid-cols-3 rounded-xl overflow-hidden border border-white/10">
-                <button data-mode="situation"   class="px-3 py-2 text-sm ${mode==='situation'  ?'bg-white text-black':'bg-white/5 hover:bg-white/10'}">상황</button>
-                <button data-mode="personality" class="px-3 py-2 text-sm ${mode==='personality'?'bg-white text-black':'bg-white/5 hover:bg-white/10'}">성격</button>
-                <button data-mode="appearance"  class="px-3 py-2 text-sm ${mode==='appearance' ?'bg-white text-black':'bg-white/5 hover:bg-white/10'}">생김새</button>
+                ${tabButton('situation','상황', false)}
+                ${tabButton('personality','성격', !premiumUnlocked)}
+                ${tabButton('appearance','생김새', !premiumUnlocked)}
               </div>
               <button id="btn-history" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 transition">🕘 <span class="hidden sm:inline">히스토리</span></button>
             </div>
@@ -274,13 +277,22 @@
           </div>
 
           <div class="mt-3 text-xs text-gray-300/80 flex items-center justify-between">
-            <span>추천 종류: <b>${ds.name}</b> · 항목 ${ds.items.length}개</span>
+            <span>추천 종류: <b>${ds.name}</b> · 항목 ${ds.items.length}개${premiumUnlocked?'':' · 프리미엄 잠금 🔒'}</span>
             <span class="opacity-70">조약돌 마을</span>
           </div>
         </div>
+
+        ${passwordModalHTML()}
       `;
 
       bindEvents(); syncFlip();
+    }
+
+    function tabButton(key, label, locked){
+      const active = (mode===key);
+      const base = active ? 'bg-white text-black' : 'bg-white/5 text-white hover:bg-white/10';
+      const lock = locked ? ' 🔒' : '';
+      return `<button data-mode="${key}" class="px-3 py-2 text-sm ${base}">${label}${lock}</button>`;
     }
 
     function syncFlip(){
@@ -298,10 +310,15 @@
     }
 
     function bindEvents(){
-      // 모드 전환
+      // 탭 전환 (잠금 확인)
       document.querySelectorAll('[data-mode]').forEach(btn=>{
         btn.onclick = (e)=>{
-          mode = e.currentTarget.getAttribute('data-mode');
+          const target = e.currentTarget.getAttribute('data-mode');
+          if ((target==='personality' || target==='appearance') && !premiumUnlocked){
+            openPasswordModal();
+            return;
+          }
+          mode = target;
           storage.set("emojiIdea.mode", mode);
           flipped=false; // 탭 바꾸면 앞면부터
           render();
@@ -322,6 +339,27 @@
       };
 
       document.getElementById('btn-history').onclick = openHistory;
+
+      // 비밀번호 모달 이벤트
+      const pwOk = document.getElementById('pw-ok');
+      const pwCancel = document.getElementById('pw-cancel');
+      const pwInput = document.getElementById('pw-input');
+      if (pwOk && pwCancel && pwInput){
+        pwCancel.onclick = closePasswordModal;
+        pwOk.onclick = () => {
+          const val = pwInput.value.trim();
+          if (val === PREMIUM_PASS){
+            premiumUnlocked = true;
+            storage.set("emojiIdea.premiumUnlocked", true);
+            toast('프리미엄 해제 완료! 🎉');
+            closePasswordModal();
+            render();
+          } else {
+            toast('비밀번호가 틀렸어요 😢');
+            pwInput.focus();
+          }
+        };
+      }
     }
 
     /* ---------------- 히스토리 ---------------- */
@@ -362,10 +400,35 @@
       });
       wrap.querySelectorAll('[data-view]').forEach(btn=> btn.onclick = (e)=>{
         const raw=e.currentTarget.getAttribute('data-view'); if(!raw) return;
-        const [t,id]=raw.split(":"); mode=t; storage.set("emojiIdea.mode", mode);
+        const [t,id]=raw.split(":"); 
+        if ((t==='personality' || t==='appearance') && !premiumUnlocked){
+          openPasswordModal();
+          return;
+        }
+        mode=t; storage.set("emojiIdea.mode", mode);
         current=Number(id); flipped=true; render(); wrap.remove();
       });
     }
+
+    /* --------- 비밀번호 모달 --------- */
+    function passwordModalHTML(){
+      return `
+        <div id="pw-wrap" class="hidden fixed inset-0 z-50 items-center justify-center">
+          <div class="absolute inset-0 bg-black/60"></div>
+          <div class="relative w-[92vw] max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 backdrop-blur p-4 text-white">
+            <h3 class="text-lg font-semibold mb-2">프리미엄 암호 입력</h3>
+            <p class="text-sm text-gray-300/80 mb-3">성격/생김새 탭은 프리미엄입니다. 암호를 입력해주세요.</p>
+            <input id="pw-input" type="password" class="w-full rounded-lg bg-white/10 border border-white/20 px-3 py-2 mb-3 outline-none focus:ring-2 focus:ring-amber-300/60" placeholder="암호 입력" />
+            <div class="flex items-center justify-end gap-2">
+              <button id="pw-cancel" class="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">취소</button>
+              <button id="pw-ok" class="rounded-lg bg-amber-400 text-black px-3 py-2 text-sm hover:bg-amber-300">해제</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    function openPasswordModal(){ const el=document.getElementById('pw-wrap'); if(el){ el.classList.remove('hidden'); document.getElementById('pw-input').focus(); } }
+    function closePasswordModal(){ const el=document.getElementById('pw-wrap'); if(el){ el.classList.add('hidden'); } }
 
     // 초기 렌더
     render();
