@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>오늘 그릴 그림은? | 조약돌 마을</title>
+  <!-- Tailwind (CDN, 무빌드) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 3D 카드 + 사파리 대응 */
+    .scene { perspective: 1200px; -webkit-perspective: 1200px; }
+    .card { transform-style: preserve-3d; -webkit-transform-style: preserve-3d;
+            transition: transform .8s cubic-bezier(.2,.8,.2,1); will-change: transform; }
+    .card.is-flipped { transform: rotateY(180deg); }
+    .card-face { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .card-back { transform: rotateY(180deg); }
+    .hidden-face { opacity: 0; pointer-events: none; }
+    .visible-face { opacity: 1; pointer-events: auto; }
+    .focus-ring { outline: none; }
+    .focus-ring:focus { box-shadow: 0 0 0 2px rgba(251,191,36,.6); }
+    .pill { font-size: 12px; border-radius: 9999px; padding: .25rem .6rem; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.08); }
+  </style>
+</head>
+<body class="min-h-screen w-full bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#1f2937] text-white flex items-center justify-center p-4">
+  <div id="app" class="w-full max-w-xl"></div>
+
+  <script>
+    /* ---------------- 상황 45 ---------------- */
+    const SITUATIONS = [
+      { id:1,title:"축하하는 대화 상황",category:"대화",examples:["케이크","폭죽","꽃가루","파티모자","'축하해!'"] },
+      { id:2,title:"위로해주는 대화 상황",category:"대화",examples:["토닥토닥 손","따뜻한 담요","티슈","핫팩","'괜찮아'"] },
+      { id:3,title:"상담해주는 대화 상황",category:"대화",examples:["노트와 펜","헤드셋","상담소 간판","체크리스트","생각 구름"] },
+      { id:4,title:"잔소리하는 상황",category:"대화",examples:["허리에 손","손가락 짚기","호루라기","경고 표지","찌릿 눈썹"] },
+      { id:5,title:"애교부리는 상황",category:"감정",examples:["반짝눈","하트 뿅","브이 포즈","볼 콕","달콤 말풍선"] },
+      { id:6,title:"웃는 상황",category:"감정",examples:["눈웃음","박장대소","'ㅋㅋ'","웃음 눈물","하이파이브"] },
+      { id:7,title:"우는 상황",category:"감정",examples:["뚝뚝 눈물","울먹","휴지","콧물 방울","빗방울 배경"] },
+      { id:8,title:"슬퍼하는 상황",category:"감정",examples:["고개 푹","비구름","회색 배경","작아짐","한숨"] },
+      { id:9,title:"멋쩍어하는 상황(민망)",category:"감정",examples:["뒷머리 긁적","식은땀","볼 홍조","시선 회피","머쓱 표정"] },
+      { id:10,title:"부탁하는 상황",category:"대화",examples:["합장 손","반짝 눈빛","'제발~'","리본 상자","고개 끄덕"] },
+      { id:11,title:"감사하는 상황",category:"대화",examples:["꾸벅 인사","감사 카드","선물 상자","'고마워'","꽃다발"] },
+      { id:12,title:"마무리 인사",category:"대화",examples:["손 흔들기","잘자 모자","문 닫힘","별·달","'안녕~'"] },
+      { id:13,title:"화내는 상황 (버럭)",category:"감정",examples:["불꽃 눈썹","증기","분노 게이지","빨간 배경","번개"] },
+      { id:14,title:"놀라는 상황 (헉!)",category:"감정",examples:["동그란 눈","!?!","점프","머리 곤두섬","'헉'"] },
+      { id:15,title:"사랑 고백/애정",category:"대화",examples:["하트 눈","쪽!","꽃다발","러브 레터","하트 배경"] },
+      { id:16,title:"심심할 때",category:"상황",examples:["하품","탁상시계","볼 긁적","심드렁","낙서"] },
+      { id:17,title:"피곤/지침",category:"상황",examples:["다크서클","커피","반쯤 감은 눈","기지개","zzz"] },
+      { id:18,title:"득의양양/자랑",category:"감정",examples:["선글라스","엄지척","트로피","반짝 효과","자신만만"] },
+      { id:19,title:"장난",category:"상황",examples:["메롱","깜짝 상자","장난 종","몰카","스티커"] },
+      { id:20,title:"기다림 (언제 와?)",category:"상황",examples:["모래시계","시계 응시","문 쳐다봄","발 동동","'언제와?'"] },
+      { id:21,title:"고민 (흠…)",category:"감정",examples:["턱 괴기","물음표","미로","땀방울","저울"] },
+      { id:22,title:"회피/도망",category:"상황",examples:["먼지 구름","식은땀","숨기","뒤돌아 도망","벽 뒤 힐끔"] },
+      { id:23,title:"사과",category:"대화",examples:["두 손 모아","사과 카드","'미안해'","고개 숙임","작아짐"] },
+      { id:24,title:"공감/맞장구",category:"대화",examples:["끄덕","'ㅇㅇ'","손뼉 척","싱긋","동그라미"] },
+      { id:25,title:"약속/시간",category:"대화",examples:["달력","시계","체크","메신저 말풍선","약속 도장"] },
+      { id:26,title:"응원/파이팅",category:"대화",examples:["응원봉","'파이팅!'","근육","깃발","불꽃"] },
+      { id:27,title:"칭찬",category:"대화",examples:["별 스티커","칭찬 도장","왕관","엄지척","'최고!'"] },
+      { id:28,title:"배고픔",category:"상황",examples:["꼬르륵","수저 포크","김나는 음식","침 방울","빈 접시"] },
+      { id:29,title:"지각/허둥지둥",category:"상황",examples:["알람 폭발","헐레벌떡","땀방울","넘어진 운동화","'지각!'"] },
+      { id:30,title:"선물/서프라이즈",category:"대화",examples:["리본 상자","카드","하트 태그","전달 제스처","폭죽"] },
+      { id:31,title:"눈치 보기",category:"감정",examples:["힐끔","…","식은땀 한 방울","작아짐","커튼 뒤"] },
+      { id:32,title:"비밀/쉿",category:"대화",examples:["입에 손가락","지퍼 입","자물쇠","작은 말풍선","어두운 배경"] },
+      { id:33,title:"공부/집중",category:"상황",examples:["책 더미","안경","형광펜","스톱워치","'집중!'"] },
+      { id:34,title:"운동/다이어트",category:"상황",examples:["아령","줄넘기","물병","땀방울","칼로리"] },
+      { id:35,title:"비 오는 날",category:"상황",examples:["우산","장화","물웅덩이","주룩 선","빗방울"] },
+      { id:36,title:"폭염/더위",category:"상황",examples:["부채","얼음","선풍기","해 모자","게이지"] },
+      { id:37,title:"한파/추움",category:"상황",examples:["목도리","입김","귀마개","눈송이","덜덜"] },
+      { id:38,title:"일요일 힐링",category:"상황",examples:["소파","핫초코","담요","노트북","힐링"] },
+      { id:39,title:"월요일 우울",category:"감정",examples:["알람","한숨","초점잃은 눈","커피 대자","'월요병'"] },
+      { id:40,title:"쇼핑/결제",category:"상황",examples:["장바구니","카드","택배 박스","세일 태그","영수증"] },
+      { id:41,title:"게임 승/패",category:"감정",examples:["트로피","게임패드","별 효과","KO","슬픈 이모지"] },
+      { id:42,title:"여행/출발",category:"상황",examples:["캐리어","비행기","지도","티켓","사진"] },
+      { id:43,title:"건강/병원",category:"상황",examples:["체온계","파스","밴드","약 봉지","'훅' 기침"] },
+      { id:44,title:"소소한 행복",category:"감정",examples:["작은 꽃","반짝이","따뜻한 미소","쿠키","하트 점"] },
+      { id:45,title:"집중 업무/마감",category:"상황",examples:["키보드","마감 타이머","포스트잇","커피 2잔","다크서클"] },
+    ];
+
+    /* --------------- 성격 50 --------------- */
+    const PERSONALITIES = [
+      {id:101,title:"잘 삐지는 성격",examples:["입 뿡","삐- 말풍선","팔짱","뾰루퉁 눈썹","뒤돌아섬"]},
+      {id:102,title:"흑화한 모습",examples:["검은 오라","번개 눈","미소 삭제","그림자 배경","균열 효과"]},
+      {id:103,title:"영혼 없음",examples:["무표정 눈","직선 입","회색 톤","기계적 말풍선","…"]},
+      {id:104,title:"논리적임",examples:["안경","그래프/도표","근거1·2 말풍선","체크리스트","포인터"]},
+      {id:105,title:"감정적임",examples:["눈물/하트","감정 게이지","파도선","가슴 톡톡","감탄사"]},
+      {id:106,title:"호들갑쟁이",examples:["과한 제스처","스파클","큰 말풍선","점프","!?"]},
+      {id:107,title:"겁쟁이",examples:["덜덜","파랗게 질림","숨기","식은땀","'무서워'"]},
+      {id:108,title:"눈치 보는",examples:["힐끔","작아짐","…","식은땀","눈동자 흔들"]},
+      {id:109,title:"온화한",examples:["따뜻한 미소","부드러운 톤","햇살","꽃잎","말풍선(천천히)"]},
+      {id:110,title:"자상한",examples:["포근 담요","등 토닥","따끈 차","미소 눈","하트 작은"]},
+      {id:111,title:"인자한",examples:["눈꼬리 아래","손짓(오너라)","광채","가디건","온화 말풍선"]},
+      {id:112,title:"건방짐",examples:["코웃음","턱 치켜듦","팔짱","작은 왕관","'흥'"]},
+      {id:113,title:"예의바름",examples:["90도 인사","공손 말풍선","단정 옷","명찰","두 손 모음"]},
+      {id:114,title:"무해함",examples:["둥근 눈","순한 미소","파스텔","작은 하트","'헤헤'"]},
+      {id:115,title:"의젓함",examples:["당당 자세","허리 펴기","목 메달","엄지척","배지"]},
+      {id:116,title:"공손함",examples:["합장","존댓말","작은 발자국","고개 숙임","리본 타이"]},
+      {id:117,title:"질문쟁이",examples:["물음표 난무","손 번쩍","메모장","고개 갸웃","'왜?'"]},
+      {id:118,title:"허세쟁이",examples:["선글라스","스포트라이트","돈다발","허리 꺾기","'나 정도'"]},
+      {id:119,title:"쑥스러움",examples:["볼 홍조","모자 푹","소곤소곤","시선 아래","손가락 꼼지락"]},
+      {id:120,title:"낙천적",examples:["햇살","무지개","큰 미소","하트 풍선","'될거야'"]},
+      {id:121,title:"비관적",examples:["비구름","한숨","어두운 톤","한 줄기 빛","'어차피'"]},
+      {id:122,title:"꼼꼼함",examples:["체크 3중","돋보기","자/눈금","포스트잇","확인 도장"]},
+      {id:123,title:"대충대충",examples:["삐뚤쭉","대충 체크","하품","대충 OK","텅 빈 눈"]},
+      {id:124,title:"완벽주의",examples:["0.0 오차","광택","각도기","먼지 제거","'완벽'"]},
+      {id:125,title:"귀차니즘",examples:["침대/소파","이불속","알람 무시","느릿 대사","하품"]},
+      {id:126,title:"승부욕 강함",examples:["불꽃 눈","트로피","스코어 보드","주먹 불끈","'가자!'"]},
+      {id:127,title:"소심함",examples:["작아짐","점선 말풍선","두근두근","한 발 뒤","손모아"]},
+      {id:128,title:"대담함",examples:["팔 벌림","번개 배경","굵은 대사","앞장서기","부스터"]},
+      {id:129,title:"현실주의",examples:["계산기","지갑 확인","차분 표정","To-Do","체크"]},
+      {id:130,title:"몽상가",examples:["별/달","구름 타기","하늘보기","꿈 말풍선","반짝"]},
+      {id:131,title:"프로참견러",examples:["돋보기","'근데'","메모","찌릿 눈","손가락 쿡"]},
+      {id:132,title:"덕후력 폭발",examples:["별광채","굿즈 더미","하트눈","스티커 범벅","응원봉"]},
+      {id:133,title:"식탐왕",examples:["뺏어먹기","수저 번쩍","하트 음식","군침","'한 입만'"]},
+      {id:134,title:"잔소리꾼",examples:["호루라기","경고표지","손가락","스톱워치","'또?'"]},
+      {id:135,title:"츤데레",examples:["귀 빨개짐","툴툴","뒤돌아 선 선물","'아냐'","하트 숨김"]},
+      {id:136,title:"관종미 뿜뿜",examples:["스팟라이트","카메라","V포즈","반짝","'봐줘!'"]},
+      {id:137,title:"외유내강",examples:["부드러운 미소","강한 주먹","꽃+철근","티 안남","'걱정마'"]},
+      {id:138,title:"속정 깊음",examples:["뒤에서 챙김","따뜻한 도시락","우산 씌우기","메모 쪽지","작은 하트"]},
+      {id:139,title:"쿨내 진동",examples:["선글라스","팔짱","한줄 코멘트","얼음결","바람선"]},
+      {id:140,title:"광기 한 스푼",examples:["눈 흔들림","기괴 미소","사선 배경","하하하","균열"]},
+      {id:141,title:"수다쟁이",examples:["말풍선 연속","손 제스처","하하호호","빠른 텍스트","마이크"]},
+      {id:142,title:"무뚝뚝",examples:["점표정","짧은 대사","팔짱","단색 배경","쿨톤"]},
+      {id:143,title:"친화력 높음",examples:["하이파이브","군중 하트","웃는 눈","반갑다","팔 벌림"]},
+      {id:144,title:"책임감 강함",examples:["체크 100%","메모 꽉","단단한 표정","방패","'맡겨'"]},
+      {id:145,title:"프로참을성",examples:["모래시계","3중 대기","미동없음","미소 유지","'기다릴게'"]},
+      {id:146,title:"돌직구",examples:["직선 화살","단도직입","정면 응시","감탄부호","퉁명"]},
+      {id:147,title:"눈물 많은",examples:["눈물샘 폭발","휴지","콧물","울먹","붉은 눈"]},
+      {id:148,title:"부끄럼 無",examples:["당당 V","무표정","'뭐 어때'","힙 포즈","키스 보내기"]},
+      {id:149,title:"배려심 깊음",examples:["문 잡아주기","담요 덮어주기","양보","미소 눈","하트"]},
+      {id:150,title:"질투많음",examples:["초록질투","흠칫","윽 눈","망원경","'누구야?'"]},
+    ];
+
+    /* --------------- 생김새 50 --------------- */
+    const APPEARANCES = [
+      {id:201,title:"입술이 두꺼운",examples:["립글로스 광택","도톰 라인","미소 주름","하이라이트","진한 립"]},
+      {id:202,title:"입술이 얇은",examples:["가느다란 라인","옅은 컬러","작은 하트 입","미소 점","미니 립"]},
+      {id:203,title:"눈썹이 진한",examples:["굵은 눈썹","각진 끝","브로우 젤","강한 표정","그라데"]},
+      {id:204,title:"눈썹이 옅은",examples:["연한 선","부드러운 각","파우더 결","순한 표정","점선 브로우"]},
+      {id:205,title:"눈이 반짝이는",examples:["하이라이트×2","스파클","별 점","큰 동공","물망초"]},
+      {id:206,title:"눈이 큰",examples:["확대 동공","속눈썹 위쪽","반달 하이라이트","동그란 테두리","눈빛 강조"]},
+      {id:207,title:"눈이 작은",examples:["작은 점눈","짧은 속눈썹","아래 점광","좁은 동공","미니 눈매"]},
+      {id:208,title:"눈꼬리 올라간",examples:["아이라인 상승","고양이눈","날렵 각도","윙","도도 표정"]},
+      {id:209,title:"눈꼬리 내려간",examples:["아이라인 하강","강아지눈","부드러운 각","살짝 축","순둥 표정"]},
+      {id:210,title:"속눈썹이 긴",examples:["긴 컬","세 가닥 포인트","눈꼬리 강조","볼륨","윙래시"]},
+      {id:211,title:"콧구멍이 큰",examples:["넓은 콧망울","둥근 하이라이트","코그림자","코선 두껍게","숨~"]},
+      {id:212,title:"코가 오뚝한",examples:["세로 하이라이트","명확한 콧대","코끝 하이라이트","음영","날렵"]},
+      {id:213,title:"코가 낮은",examples:["완만 콧대","부드러운 그림자","둥근 코끝","하이라이트 적게","귀여운 톤"]},
+      {id:214,title:"볼살이 통통한",examples:["볼 홍조","둥근 윤곽","복숭아 톤","말랑 선","통통 이모지"]},
+      {id:215,title:"광대가 도드라진",examples:["광대 하이라이트","측면 음영","각진 윤곽","스마일 라인","강한 빛"]},
+      {id:216,title:"턱이 길다",examples:["늘어진 윤곽","V라인 길게","아래 그림자","긴 턱선","말풍선 아래로"]},
+      {id:217,title:"턱이 짧다",examples:["짧은 V라인","둥근 아래","짧은 그림자","콤팩트 윤곽","귀여운 비율"]},
+      {id:218,title:"턱선이 날카로운",examples:["샤프 라인","광택 포인트","강한 음영","쯧 표정","모델 느낌"]},
+      {id:219,title:"턱살이 있는",examples:["이중턱 곡선","부드러운 음영","눌린 입","볼살 연결","편안 표정"]},
+      {id:220,title:"이마가 넓은",examples:["넓은 하이라이트","앞머리 들림","윗공간 넉넉","헤어라인 위","빛망울"]},
+      {id:221,title:"이마가 좁은",examples:["낮은 헤어라인","앞머리 길게","작은 하이라이트","압축 비율","콤팩트 머리"]},
+      {id:222,title:"머리가 큰",examples:["헤드 비율↑","넓은 뒷통수 선","볼륨 헤어","강조 선","코믹 비율"]},
+      {id:223,title:"머리가 작은",examples:["헤드 비율↓","슬림 헤어","얼굴 강조","어깨 넓어보임","미니 헤드"]},
+      {id:224,title:"목이 짧은",examples:["짧은 네크","어깨 가까움","옷깃 밀착","그림자 짧게","꾸깃"]},
+      {id:225,title:"목이 긴",examples:["기린넥","세로 하이라이트","목주름 2줄","V넥","우아"]},
+      {id:226,title:"얼굴이 둥근",examples:["원형 윤곽","볼 둥글게","부드러운 그림자","동글 눈","말랑"]},
+      {id:227,title:"얼굴이 긴",examples:["타원 윤곽","세로 강조","좁은 폭","길게 하이라이트","슬림"]},
+      {id:228,title:"얼굴이 납작한",examples:["낮은 코","넓은 얼굴면","평평 톤","가로 강조","귀여운 납작이"]},
+      {id:229,title:"귀가 큰",examples:["큰 귓바퀴","반짝 하이라이트","음영 강조","살짝 튀어나옴","귀걸이 포인트"]},
+      {id:230,title:"귀가 뾰족한",examples:["요정귀","위로 각","얇은 끝","작은 장식","판타지"]},
+      {id:231,title:"쌍꺼풀이 진",examples:["진한 주름선","윗음영","큰 눈동자","반짝","속눈썹 풍성"]},
+      {id:232,title:"무쌍꺼풀",examples:["매끈 윗선","심플 동공","아이라인 얇게","담백 눈매","시크"]},
+      {id:233,title:"눈 밑 다크서클",examples:["아래 반원 음영","세로 주름","피곤 말풍선","하품","커피"]},
+      {id:234,title:"주근깨가 있는",examples:["코·볼 점점점","오렌지 톤","햇살","웃을 때 강조","장난스러움"]},
+      {id:235,title:"점(뷰티마크)이 있는",examples:["입가 점","눈밑 점","코옆 점","강조 동그라미","포인트]"]},
+      {id:236,title:"치아가 고른",examples:["밝은 이빨","스마일 라인","화이트닝","😁 이모지","광택"]},
+      {id:237,title:"앞니가 토끼 같은",examples:["두 앞니 강조","아래 작은 이","귀여운 미소","치아 하이라이트","토끼"]},
+      {id:238,title:"입꼬리가 올라간",examples:["윙 스마일","광대 하이라이트","웃는 눈","볼 주름","기분 좋음"]},
+      {id:239,title:"입꼬리가 내려간",examples:["하강 스마일","입 양끝 그림자","시무룩 눈","볼선 약함","머쓱"]},
+      {id:240,title:"볼 보조개가 있는",examples:["패임 점","웃을 때 강조","하트 도트","볼 그림자","귀여움"]},
+      {id:241,title:"코끝이 둥근",examples:["라운드 코끝","하이라이트 점","부드러운 콧망울","둥근 그림자","말랑"]},
+      {id:242,title:"코끝이 뾰족한",examples:["삼각 코끝","샤프 하이라이트","콧대 선명","각진 그림자","날렵"]},
+      {id:243,title:"콧대가 넓은",examples:["넓은 하이라이트","양쪽 음영 약","강한 존재감","직선","와이드"]},
+      {id:244,title:"콧대가 얇은",examples:["가는 하이라이트","양쪽 음영 진","섬세한 라인","슬림 코","샤프"]},
+      {id:245,title:"광대가 낮은",examples:["볼 중심 아래","부드러운 면","그림자 적게","순한 인상","완만 윤곽"]},
+      {id:246,title:"눈동자가 하트",examples:["하트 동공","반짝","핑크 톤","사랑 이펙트","두근"]},
+      {id:247,title:"눈동자가 별",examples:["별 동공","스파클","우주 배경","반짝 선","감탄"]},
+      {id:248,title:"눈동자가 고양이",examples:["세로 동공","샤프 눈빛","아이라인↑","검은자 비율↑","도도"]},
+      {id:249,title:"눈동자가 동그라미",examples:["동그란 동공","하이라이트×2","귀여운 눈","둥근 테두리","순둥"]},
+      {id:250,title:"수염이 난",examples:["턱수염","콧수염","점수염","까칠 자라남","면도기"]},
+    ];
+
+    const DATASETS = {
+      situation:  { name: "상황",   items: SITUATIONS },
+      personality:{ name: "성격",   items: PERSONALITIES },
+      appearance: { name: "생김새", items: APPEARANCES },
+    };
+
+    /* ---------------- 상태/저장소 ---------------- */
+    const storage = {
+      get(k,f){ try{ const r=localStorage.getItem(k); return r?JSON.parse(r):f; }catch{ return f; } },
+      set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+    };
+
+    let mode = storage.get("emojiIdea.mode","situation"); // 'situation' | 'personality' | 'appearance'
+    let flipped=false, current=null;
+    let history = storage.get("emojiIdea.historyV2", []); // {type,id,t}[]
+    const $ = s => document.querySelector(s);
+    const toast = (msg)=>{ const el=document.createElement('div'); el.className='fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-full bg-white text-black px-4 py-2 shadow-lg text-sm'; el.textContent=msg; document.body.appendChild(el); setTimeout(()=>el.remove(),1600); };
+
+    function drawNew(){
+      const list = DATASETS[mode].items;
+      const next = list[Math.floor(Math.random()*list.length)];
+      current = next.id;
+      flipped = false;
+      history = [{type:mode,id:next.id,t:Date.now()}, ...history].slice(0,80);
+      storage.set("emojiIdea.historyV2", history);
+    }
+
+    /* ---------------- 렌더 ---------------- */
+    function render(){
+      const ds = DATASETS[mode];
+      const item = ds.items.find(x=>x.id===current) || null;
+
+      $('#app').innerHTML = `
+        <div>
+          <header class="flex items-center justify-between mb-4">
+            <div>
+              <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">오늘 그릴 그림은?</h1>
+              <p class="text-sm text-gray-300/90">카카오톡 이모티콘 주제 랜덤 추천기</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="grid grid-cols-3 rounded-xl overflow-hidden border border-white/10">
+                <button data-mode="situation"   class="px-3 py-2 text-sm ${mode==='situation'  ?'bg-white text-black':'bg-white/5 hover:bg-white/10'}">상황</button>
+                <button data-mode="personality" class="px-3 py-2 text-sm ${mode==='personality'?'bg-white text-black':'bg-white/5 hover:bg-white/10'}">성격</button>
+                <button data-mode="appearance"  class="px-3 py-2 text-sm ${mode==='appearance' ?'bg-white text-black':'bg-white/5 hover:bg-white/10'}">생김새</button>
+              </div>
+              <button id="btn-history" class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10 transition">🕘 <span class="hidden sm:inline">히스토리</span></button>
+            </div>
+          </header>
+
+          <div class="scene relative">
+            <div id="card" class="card relative h-64 sm:h-72 w-full">
+              <!-- 앞면 -->
+              <div class="card-face front absolute inset-0 rounded-3xl shadow-2xl overflow-hidden border border-emerald-300/25 ${flipped?'hidden-face':'visible-face'}">
+                <div class="h-full w-full bg-gradient-to-br from-[#cfe8b6] via-[#b9d8a2] to-[#9dc58a] relative flex flex-col items-center justify-center text-emerald-950/90">
+                  <div class="absolute inset-0" style="background:
+                    radial-gradient(circle at 25% 20%, rgba(255,255,255,.45), transparent 45%),
+                    radial-gradient(circle at 80% 10%, rgba(255,255,255,.25), transparent 55%)"></div>
+                  <p class="text-[40px] sm:text-[48px] font-extrabold tracking-tight drop-shadow-sm">조약돌 마을</p>
+                  <p class="mt-2 text-sm opacity-80">카드를 뒤집어 주제를 확인하세요</p>
+                </div>
+              </div>
+              <!-- 뒷면 -->
+              <div class="card-face card-back absolute inset-0 rounded-3xl shadow-2xl overflow-hidden border border-white/10 ${flipped?'visible-face':'hidden-face'}">
+                <div class="h-full w-full bg-gradient-to-b from-slate-900/70 to-slate-800/60 backdrop-blur-sm">
+                  <div class="h-full w-full flex flex-col items-center justify-center p-6 text-center">
+                    ${item ? `
+                      <div class="inline-flex items-center gap-2 text-amber-300/90 mb-2">✨
+                        <span class="text-sm">짜잔~ 오늘의 ${ds.name}</span>
+                      </div>
+                      <h2 class="text-xl sm:text-2xl font-bold leading-snug mb-2">${item.title}</h2>
+                      <div class="text-xs uppercase tracking-wide text-gray-300/80 mb-1">${ds.name}</div>
+                      <div class="text-xs text-gray-300/80 mb-2">그림 요소 추천</div>
+                      <div class="flex flex-wrap items-center justify-center gap-2">
+                        ${item.examples.map(ex=>`<span class="pill">${ex}</span>`).join('')}
+                      </div>
+                    ` : `
+                      <p class="text-sm">아직 카드를 뒤집지 않았어요</p>
+                      <p class="text-xs text-gray-400">터치/클릭으로 시작!</p>
+                    `}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button id="btn-flip" class="absolute inset-0 rounded-3xl focus-ring" aria-label="카드 뒤집기"></button>
+          </div>
+
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <button id="btn-new" class="flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-2 transition">🔀 <span>새 카드</span></button>
+            <button id="btn-copy" class="flex items-center justify-center gap-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-2 transition">📋 <span>복사</span></button>
+          </div>
+
+          <div class="mt-3 text-xs text-gray-300/80 flex items-center justify-between">
+            <span>추천 종류: <b>${ds.name}</b> · 항목 ${ds.items.length}개</span>
+            <span class="opacity-70">조약돌 마을</span>
+          </div>
+        </div>
+      `;
+
+      bindEvents(); syncFlip();
+    }
+
+    function syncFlip(){
+      const card = document.getElementById('card');
+      if (!card) return;
+      card.classList.toggle('is-flipped', flipped);
+      const front = card.querySelector('.front');
+      const back  = card.querySelector('.card-back');
+      if (front && back){
+        front.classList.toggle('hidden-face', flipped);
+        front.classList.toggle('visible-face', !flipped);
+        back .classList.toggle('hidden-face', !flipped);
+        back .classList.toggle('visible-face', flipped);
+      }
+    }
+
+    function bindEvents(){
+      // 모드 전환
+      document.querySelectorAll('[data-mode]').forEach(btn=>{
+        btn.onclick = (e)=>{
+          mode = e.currentTarget.getAttribute('data-mode');
+          storage.set("emojiIdea.mode", mode);
+          flipped=false; // 탭 바꾸면 앞면부터
+          render();
+        };
+      });
+
+      document.getElementById('btn-flip').onclick = () => {
+        if (current===null){ drawNew(); flipped=true; render(); return; }
+        flipped = !flipped; syncFlip();
+      };
+      document.getElementById('btn-new').onclick = () => { drawNew(); flipped=false; render(); };
+      document.getElementById('btn-copy').onclick = async () => {
+        const ds = DATASETS[mode];
+        const item = ds.items.find(x=>x.id===current);
+        if(!item) return;
+        try{ await navigator.clipboard.writeText(`[${ds.name}] ${item.title}`); toast('복사했어요!'); }
+        catch{ toast('복사 실패'); }
+      };
+
+      document.getElementById('btn-history').onclick = openHistory;
+    }
+
+    /* ---------------- 히스토리 ---------------- */
+    function openHistory(){
+      const wrap=document.createElement('div');
+      wrap.className='fixed inset-0 z-50 flex items-center justify-center';
+      wrap.innerHTML=`
+        <div class="absolute inset-0 bg-black/60"></div>
+        <div class="relative w-[92vw] max-w-lg rounded-2xl border border-white/10 bg-slate-900/90 backdrop-blur p-4 text-white max-h-[70vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-lg font-semibold">히스토리</h3>
+            <button id="close" class="rounded-lg bg-white/5 hover:bg-white/10 p-1">✖️</button>
+          </div>
+          ${history.length===0? '<p class="text-sm text-gray-300/80">아직 히스토리가 없어요. 카드를 몇 번 뽑아보세요!</p>': ''}
+          <div class="space-y-3 pr-1">
+            ${history.map(h=>{
+              const ds = DATASETS[h.type]; const it = ds.items.find(x=>x.id===h.id);
+              const date=new Date(h.t).toLocaleString();
+              return `<div class="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 p-3">
+                <div>
+                  <p class="text-sm font-medium">[${ds.name}] ${it?.title || '(삭제됨)'}</p>
+                  <p class="text-xs text-gray-300/70">${date}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs hover:bg-white/10" data-copy="${ds.name}::${it?.title || ''}">복사</button>
+                  <button class="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs hover:bg-white/10" data-view="${h.type}:${h.id}">보기</button>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      document.body.appendChild(wrap);
+      wrap.querySelector('#close').onclick=()=> wrap.remove();
+      wrap.querySelectorAll('[data-copy]').forEach(btn=> btn.onclick = async (e)=>{
+        const raw=e.currentTarget.getAttribute('data-copy'); if(!raw) return;
+        const [g,txt]=raw.split("::");
+        try{ await navigator.clipboard.writeText(`[${g}] ${txt}`); toast('복사했어요'); }catch{ toast('복사 실패'); }
+      });
+      wrap.querySelectorAll('[data-view]').forEach(btn=> btn.onclick = (e)=>{
+        const raw=e.currentTarget.getAttribute('data-view'); if(!raw) return;
+        const [t,id]=raw.split(":"); mode=t; storage.set("emojiIdea.mode", mode);
+        current=Number(id); flipped=true; render(); wrap.remove();
+      });
+    }
+
+    // 초기 렌더
+    render();
+  </script>
+</body>
+</html>
